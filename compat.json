@@ -1,0 +1,10 @@
+{
+  "webBlink": {
+    "version": "0.21.0",
+    "release": "https://github.com/patrick-1984/web-blink/releases/tag/v0.21.0",
+    "wheel": "web_blink-0.21.0-py3-none-any.whl",
+    "wheelSha256": "dc1e03c36b5e53acbcc80ba06ac85ab90d516c5f6094355cdab3c69ac1ffc6eb",
+    "descriptorSchema": "1.3.0",
+    "extensionVersion": 1
+  }
+}

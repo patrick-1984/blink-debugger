@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "blink-debugger": {
+      "command": "python3",
+      "args": ["./mcp/server.py"],
+      "cwd": "."
+    }
+  }
+}
