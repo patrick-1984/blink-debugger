@@ -21,6 +21,7 @@ BENCH_TOOLS = (
     "ip", "iw", "hostapd", "dnsmasq", "iptables", "ip6tables", "systemctl",
     "systemd-run", "flock", "nmcli", "rfkill", "awk", "logger", "grep",
 )
+HELPER = Path("/usr/local/sbin/hl-wifi-prov")
 HELPER_SHA256 = "5f6fcc155836edfaae97cec0995db8834f838d9a6af63f499bf2e3f75381e1e7"
 SCHEMATIC = "https://raw.githubusercontent.com/defencedog/orangepi3b_v2.1/main/hardware/manuals/OPi%203B%20V2.1_schematics.pdf#page=21"
 
@@ -46,9 +47,9 @@ RUNBOOKS = {
     "lesson-suggest": ("Retrieve local software suggestions with bdbg lessons suggest.",),
     "bench-network": (
         "Use a dedicated, authorized bench fixture and verify that the separate host helper matches the tested version.",
-        "After the operator verifies the fixture and guard prerequisites, start the dedicated lab network with sudo hl-wifi-prov lab-ap --confirm.",
-        "Check status using sudo hl-wifi-prov status. Verify wireless association and DHCP with the owned fixture.",
-        "Stop the network with sudo hl-wifi-prov down. The separate helper also enforces a 30-minute maximum.",
+        "After the operator verifies the fixture and guard prerequisites, start the dedicated lab network with sudo /usr/local/sbin/hl-wifi-prov lab-ap --confirm.",
+        "Check status using sudo /usr/local/sbin/hl-wifi-prov status. Verify wireless association and DHCP with the owned fixture.",
+        "Stop the network with sudo /usr/local/sbin/hl-wifi-prov down. The separate helper also enforces a 30-minute maximum.",
     ),
     "bench-receive": (
         "Verify the selected USB receiver and choose a known sensor that belongs to the bench.",
@@ -192,9 +193,7 @@ def video_check(authorized):
 
 
 def helper_check():
-    command = shutil.which("hl-wifi-prov")
-    installed = Path("/usr/local/sbin/hl-wifi-prov")
-    path = Path(command) if command else installed
+    path = HELPER
     if not path.is_file() or not os.access(path, os.X_OK):
         return check("hl-wifi-prov", "missing", "The separate provisioning helper executable is missing.")
     try:
@@ -204,7 +203,7 @@ def helper_check():
         return check("hl-wifi-prov", "unverified", "The helper exists but its tested version could not be checked.")
     if len(data) > 65536 or hashlib.sha256(data).hexdigest() != HELPER_SHA256:
         return check("hl-wifi-prov", "unverified", "The helper exists but its bytes differ from the tested version.")
-    return check("hl-wifi-prov", "available", "The separate helper matches the exact guard-verified build.")
+    return check("hl-wifi-prov", "available", f"{path} matches the exact guard-verified build.")
 
 
 def bench_checks(flow, board):

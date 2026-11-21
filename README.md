@@ -130,10 +130,10 @@ On a prepared Orange Pi with the separate `hl-wifi-prov` helper, the operator ca
 `web-debug` access point from an authorized shell. The bench interface is down by default.
 
 ```sh
-sudo hl-wifi-prov lab-ap --confirm
+sudo /usr/local/sbin/hl-wifi-prov lab-ap --confirm
 ```
 
-Check its state with `sudo hl-wifi-prov status`. When finished, run `sudo hl-wifi-prov down`.
+Check its state with `sudo /usr/local/sbin/hl-wifi-prov status`. When finished, run `sudo /usr/local/sbin/hl-wifi-prov down`.
 
 The helper sets a 30-minute maximum, configures client isolation, allows DHCP on the bench interface
 and denies IPv4 and IPv6 forwarding. Use trusted bench devices. The timer and cleanup were verified on

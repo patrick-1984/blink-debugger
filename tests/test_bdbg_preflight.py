@@ -1,10 +1,11 @@
+import hashlib
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from bdbg_preflight import PROFILE, board_identity, describe_flow, video_check
+from bdbg_preflight import PROFILE, board_identity, describe_flow, helper_check, video_check
 
 
 class PreflightTests(unittest.TestCase):
@@ -93,6 +94,22 @@ class PreflightTests(unittest.TestCase):
         with patch("bdbg_preflight.Path.is_char_device", return_value=True), patch("bdbg_preflight.os.access", return_value=True):
             self.assertIn("1 readable", video_check([bridge])["evidence"])
             self.assertEqual(video_check([])["status"], "missing")
+
+    def test_verified_helper_matches_the_absolute_operator_command(self):
+        payload = b"supported helper"
+        other = self.root / "from-path"
+        other.write_bytes(payload)
+        other.chmod(0o700)
+        canonical = self.root / "installed-helper"
+        with patch("bdbg_preflight.HELPER", canonical), patch(
+                "bdbg_preflight.HELPER_SHA256", hashlib.sha256(payload).hexdigest()
+        ), patch("bdbg_preflight.shutil.which", return_value=str(other)):
+            self.assertEqual(helper_check()["status"], "missing")
+            canonical.write_bytes(payload)
+            canonical.chmod(0o700)
+            self.assertEqual(helper_check()["status"], "available")
+            canonical.write_bytes(b"different helper")
+            self.assertEqual(helper_check()["status"], "unverified")
 
     def test_satisfied_receive_dependencies_do_not_certify_the_owned_fixture(self):
         self.board("rockchip,rk3566-orangepi-3b", revision="2.1")
