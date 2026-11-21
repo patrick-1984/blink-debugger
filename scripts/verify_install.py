@@ -9,7 +9,16 @@ import tempfile
 
 plugin = Path(sys.argv[1])
 cli = sys.argv[2]
-server = plugin / "mcp/server.py"
+claude_manifest = json.loads((plugin / ".claude-plugin/plugin.json").read_text())
+codex_manifest = json.loads((plugin / ".codex-plugin/plugin.json").read_text())
+assert claude_manifest["name"] == codex_manifest["name"] == "blink-debugger"
+version = claude_manifest["version"]
+assert codex_manifest["version"] == version
+claude_entry = json.loads((plugin / ".mcp.json").read_text())["mcpServers"]["blink-debugger"]
+codex_entry = json.loads((plugin / codex_manifest["mcpServers"]).read_text())["mcpServers"]["blink-debugger"]
+server = Path(claude_entry["args"][0].replace("${CLAUDE_PLUGIN_ROOT}", str(plugin)))
+assert server == (plugin / codex_entry["cwd"] / codex_entry["args"][0]).resolve()
+
 
 
 def run_cli(*args, env=None):
@@ -57,7 +66,8 @@ responses = invoke_mcp([
     request(6, "tools/call", name="debugger_doctor", arguments={"command": "other"}),
 ])
 assert responses[0]["result"]["protocolVersion"] == "2025-06-18"
-assert responses[0]["result"]["serverInfo"]["version"] == "0.1.0"
+assert responses[0]["result"]["serverInfo"]["version"] == version
+assert run_cli("--version").stdout.strip() == f"bdbg {version}"
 assert len(responses[1]["result"]["tools"]) == 3
 assert tool_mcp(responses[2]) == json.loads(doctor.stdout)
 assert tool_mcp(responses[3]) == summary

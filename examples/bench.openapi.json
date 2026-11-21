@@ -1,0 +1,13 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "Example bench service", "version": "1.0.0"},
+  "servers": [{"url": "https://bench.example.invalid"}],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "readHealth",
+        "responses": {"200": {"description": "Ready"}}
+      }
+    }
+  }
+}
