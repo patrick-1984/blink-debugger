@@ -7,11 +7,13 @@ import contextlib
 import datetime
 import ipaddress
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -80,41 +82,45 @@ def capabilities():
 
 
 def read_peer_index(executable):
-    deadline = time.monotonic() + PEER_TIMEOUT
-    output = bytearray()
-    failed = threading.Event()
-    process = subprocess.Popen(
-        [executable, "schemas", "--json"],
-        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-        bufsize=0,
-    )
+    # Web Blink loads settings even for a schema query. Give the child an
+    # absent settings directory so the probe never touches operator settings.
+    with tempfile.TemporaryDirectory(prefix="bdbg-peer-") as scratch:
+        environment = dict(os.environ, BLINK_CONFIG_DIR=str(Path(scratch) / "settings"), BLINK_OUTPUT="json")
+        deadline = time.monotonic() + PEER_TIMEOUT
+        output = bytearray()
+        failed = threading.Event()
+        process = subprocess.Popen(
+            [executable, "schemas", "--json"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            bufsize=0, env=environment,
+        )
 
-    def drain():
+        def drain():
+            try:
+                while len(output) <= PEER_OUTPUT_LIMIT:
+                    chunk = process.stdout.read(min(4096, PEER_OUTPUT_LIMIT + 1 - len(output)))
+                    if not chunk:
+                        return
+                    output.extend(chunk)
+            except OSError:
+                failed.set()
+
+        reader = threading.Thread(target=drain, daemon=True)
         try:
-            while len(output) <= PEER_OUTPUT_LIMIT:
-                chunk = process.stdout.read(min(4096, PEER_OUTPUT_LIMIT + 1 - len(output)))
-                if not chunk:
-                    return
-                output.extend(chunk)
-        except OSError:
-            failed.set()
-
-    reader = threading.Thread(target=drain, daemon=True)
-    try:
-        reader.start()
-        reader.join(timeout=max(0, deadline - time.monotonic()))
-        if reader.is_alive() or failed.is_set() or len(output) > PEER_OUTPUT_LIMIT:
-            raise ValueError("Peer output unavailable or exceeds limits")
-        if process.wait(timeout=max(0, deadline - time.monotonic())):
-            raise ValueError("Peer command failed")
-        return json.loads(output, object_pairs_hook=unique_fields)
-    finally:
-        if process.poll() is None:
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
-        process.stdout.close()
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            process.wait(timeout=0.25)
+            reader.start()
+            reader.join(timeout=max(0, deadline - time.monotonic()))
+            if reader.is_alive() or failed.is_set() or len(output) > PEER_OUTPUT_LIMIT:
+                raise ValueError("Peer output unavailable or exceeds limits")
+            if process.wait(timeout=max(0, deadline - time.monotonic())):
+                raise ValueError("Peer command failed")
+            return json.loads(output, object_pairs_hook=unique_fields)
+        finally:
+            if process.poll() is None:
+                with contextlib.suppress(ProcessLookupError):
+                    process.kill()
+            process.stdout.close()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=0.25)
 
 
 def web_blink_peer():

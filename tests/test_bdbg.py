@@ -70,7 +70,7 @@ class PeerTests(unittest.TestCase):
                     {"id": "urn:web-blink:schema:weblink:1", "version": "1.3.0"},
                 ]}}
                 executable.write_text(
-                    f"#!{sys.executable}\nimport sys\n"
+                    f"#!{sys.executable}\nimport os, sys\n"
                     "assert sys.argv[1:] == ['schemas', '--json']\n"
                     f"print({json.dumps(body)!r})\n"
                 )
