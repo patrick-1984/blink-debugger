@@ -6,7 +6,8 @@ description: Learn from a Blink Debugger software or workflow task and save reus
 Use this workflow when the user asks to learn from ongoing work, improve a Blink Debugger workflow, or
 make an approved software change.
 
-1. Carry out the user's task. Correct the workflow when their feedback or verified results reveal a gap.
+1. Run `debugger_preflight` for the selected diagnostic. For software notes, preflight `lesson-record` or
+   `lesson-suggest` before the matching tool. Carry out the user's task. Correct the workflow when their feedback or verified results reveal a gap.
 2. For a reusable gap, summarize the software observation and one concrete proposed plugin fix or feature in
    short, generic prose. Omit device commands, transport data, logs, file paths, addresses, accounts, secrets,
    pasted payloads, and user-specific details. Call `debugger_record_lesson` with kind `fix` or `feature`,

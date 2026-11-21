@@ -18,7 +18,7 @@ import threading
 import time
 
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 
 SSH_PROCESSES = {"sshd", "sshd-session", "dropbear"}
@@ -47,6 +47,24 @@ PEER_OUTPUT_LIMIT = 64 * 1024
 PEER_TIMEOUT = 5
 
 
+def web_blink_executable():
+    return shutil.which("web-blink") or shutil.which("blink")
+
+
+def listener_executable():
+    path = shutil.which("ss")
+    if path is None:
+        raise ValueError("The ss executable is required for the listener check.")
+    return path
+
+
+def require_local_input(path, label, *, allow_stdin=False):
+    if allow_stdin and path == "-":
+        return
+    if not Path(path).is_file() or not os.access(path, os.R_OK):
+        raise ValueError(f"Supply a readable regular file for {label}.")
+
+
 def host_capabilities(bluetooth_devices):
     bluetooth = {"status": "unknown", "registeredAdapters": None}
     if bluetooth_devices is not None:
@@ -62,7 +80,7 @@ def host_capabilities(bluetooth_devices):
         "bluetooth": bluetooth,
         "commandsOnPath": {
             "aiMinion": shutil.which("minion") is not None,
-            "webBlink": bool(shutil.which("web-blink") or shutil.which("blink")),
+            "webBlink": web_blink_executable() is not None,
             "radioReceiver": shutil.which("rtl_433") is not None,
             "listenerCheck": shutil.which("ss") is not None,
         },
@@ -124,7 +142,7 @@ def read_peer_index(executable):
 
 
 def web_blink_peer():
-    executable = shutil.which("web-blink") or shutil.which("blink")
+    executable = web_blink_executable()
     if executable is None:
         return {"status": "missing"}
     try:
@@ -305,6 +323,12 @@ def main():
     trace = subcommands.add_parser("inspect-observations", help="summarize a local JSON Lines export")
     trace.add_argument("file", help="file path or - for stdin")
     trace.add_argument("--weblink", help="compare observed transport types with a local Web Link descriptor")
+    for action in ("preflight", "runbook"):
+        flow = subcommands.add_parser(action, help="check local prerequisites and view the selected workflow")
+        flow.add_argument("flow", nargs="?", help="flow name, or omit it to list flows")
+        flow.add_argument("--file", help="observation input path")
+        flow.add_argument("--weblink", help="optional descriptor path for observation inspection")
+        flow.add_argument("--board-profile", help="physically confirmed board profile for a bench workflow")
     args = parser.parse_args()
 
     try:
@@ -312,7 +336,7 @@ def main():
             if not 0 < args.ssh_port < 65536:
                 parser.error("--ssh-port must be between 1 and 65535")
             output = subprocess.run(
-                ["ss", "-H", "-O", "-lntup"],
+                [listener_executable(), "-H", "-O", "-lntup"],
                 check=True,
                 capture_output=True,
                 text=True,
@@ -334,7 +358,17 @@ def main():
             result = (record_lesson(args.kind, args.observation, args.suggestion)
                       if args.lesson_action == "record" else suggest_lessons())
             exit_code = 0
+        elif args.command in {"preflight", "runbook"}:
+            from bdbg_preflight import describe_flow
+            result = describe_flow(
+                args.flow, file=args.file, weblink=args.weblink, board_profile=args.board_profile,
+                include_runbook=args.command == "runbook",
+            )
+            exit_code = 1 if result["status"] == "blocked" else 0
         else:
+            require_local_input(args.file, "the observation export", allow_stdin=True)
+            if args.weblink is not None:
+                require_local_input(args.weblink, "the Web Link descriptor")
             source = contextlib.nullcontext(sys.stdin.buffer) if args.file == "-" else open(args.file, "rb")
             with source as stream:
                 result = read_observations(stream)

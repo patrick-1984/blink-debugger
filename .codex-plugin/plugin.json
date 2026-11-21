@@ -1,6 +1,6 @@
 {
   "name": "blink-debugger",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Inspect local device observation exports and check Linux host readiness and listeners.",
   "author": {"name": "patrick-1984"},
   "homepage": "https://github.com/patrick-1984/blink-debugger",

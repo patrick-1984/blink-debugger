@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blink-debugger"
-version = "0.2.1"
+version = "0.3.0"
 description = "Read-only host and device observation diagnostics"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,4 +15,4 @@ license-files = ["LICENSE"]
 bdbg = "bdbg:main"
 
 [tool.setuptools]
-py-modules = ["bdbg", "bdbg_lessons"]
+py-modules = ["bdbg", "bdbg_lessons", "bdbg_preflight"]

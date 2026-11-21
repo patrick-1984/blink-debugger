@@ -1,7 +1,8 @@
 # Blink Debugger agent guidance
 
 Use the installed [Blink Debugger skill](skills/blink-debugger/SKILL.md) for approved host diagnostics
-and saved observations. Enter software learning or building mode when the user asks you to learn from
+and saved observations. Start every supported flow with the installed preflight. Report missing required components
+and unverified hardware checks before acting. Use a device runbook after checking the local board family and revision. Enter software learning or building mode when the user asks you to learn from
 a diagnostic workflow, improve how it works, or make an approved software change.
 
 - Complete the requested task and use the user's feedback to correct the workflow as you go.

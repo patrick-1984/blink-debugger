@@ -2,7 +2,7 @@
 
 Blink Debugger checks Linux host readiness and summarizes saved device observations. It runs with Python
 3.8 or later. [Web Blink](https://github.com/patrick-1984/web-blink#use-web-blink-with-blink-debugger) is an
-optional companion for Web Link descriptors. [Release v0.2.1](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.1)
+optional companion for Web Link descriptors. [Release v0.3.0](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.3.0)
 includes this guide, a plugin ZIP and a Python wheel.
 
 ## Install
@@ -24,19 +24,19 @@ codex plugin add blink-debugger@patrick-1984
 For shell use, activate a virtual environment and install the wheel to get `bdbg`.
 
 ```sh
-python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.1/blink_debugger-0.2.1-py3-none-any.whl
+python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.3.0/blink_debugger-0.3.0-py3-none-any.whl
 ```
 
 The ZIP has a standalone script and example files. Download and extract it to try the sample on any Linux host with
-Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.1)
+Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.3.0)
 
 ```sh
-base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.1
-curl -fLO "$base/blink-debugger-0.2.1.zip"
+base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.3.0
+curl -fLO "$base/blink-debugger-0.3.0.zip"
 curl -fLO "$base/SHA256SUMS"
 sha256sum --ignore-missing -c SHA256SUMS
-python3 -m zipfile -e blink-debugger-0.2.1.zip blink-debugger-0.2.1
-cd blink-debugger-0.2.1
+python3 -m zipfile -e blink-debugger-0.3.0.zip blink-debugger-0.3.0
+cd blink-debugger-0.3.0
 python3 bdbg.py doctor
 python3 bdbg.py inspect-observations examples/observations.jsonl --weblink examples/weblink.json
 ```
@@ -96,6 +96,33 @@ Use `bdbg doctor --probe-web-blink` to query the local Web Blink schema index. I
 `bdbg capabilities` describes the Web Link descriptor and transport extension supported by the installed debugger. Web Blink can read it through that fixed CLI command. The response identifies the debugger version and the supported descriptor without probing hardware.
 
 `check-listeners` checks TCP and UDP bindings in the current Linux network namespace with `ss`. Run it with sufficient socket owner visibility. It excludes loopback, accepts attributable SSH listeners on TCP 22 by default, and reports unexpected bindings. Use `--ssh-port` if this host uses another port. Exit 0 means pass, 1 means unexpected bindings, and 2 means incomplete attribution or an execution error. Routing and firewall rules determine reachability.
+
+## Preflight and device runbooks
+
+Start with `bdbg preflight` or `debugger_preflight` to list supported workflows. Select the flow and
+supply its inputs to see which dependencies are available, missing or unverified. Each result marks
+required and optional checks and names the local evidence. The matching runbook adds operator steps.
+
+```sh
+bdbg preflight inspect-observations --file observations.jsonl --weblink weblink.json
+bdbg preflight check-listeners
+bdbg runbook kvm
+```
+
+The installed tools `debugger_preflight` and `debugger_runbook` accept a `flow`. Supply absolute
+`file` and optional `weblink` paths for observation inspection. The reports cover the existing host,
+file, peer and lesson commands plus bench network, receive-only and KVM workflows.
+
+The CLI reports blocked flows with exit 1. `dependencyStatus` describes local dependency checks,
+and the overall `status` includes manual verification. An executable found on PATH establishes presence.
+Running the supported check establishes its actual result.
+
+For the Orange Pi 3B v2.1, the runbooks distinguish the separate HDMI capture host path, A1 USB2 OTG
+data socket and Type-C power socket. If the local device tree identifies the family without the PCB
+revision, confirm the physical revision before selecting
+`bdbg runbook kvm --board-profile orange-pi-3b-v2.1`. The report records operator confirmation separately
+from device-tree evidence. Live video, USB device role, A1 power through boot and reset, and authorized
+manual input remain separate checks.
 
 ## Optional Orange Pi bench network
 

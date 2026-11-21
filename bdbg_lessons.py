@@ -6,8 +6,14 @@ import json
 import os
 from pathlib import Path
 import re
-import sqlite3
 import stat
+
+try:
+    import sqlite3
+except ImportError:
+    sqlite3 = None
+
+STORAGE_ERRORS = (OSError, sqlite3.Error) if sqlite3 is not None else (OSError,)
 
 
 KINDS = ("fix", "feature")
@@ -69,12 +75,36 @@ def database_path(write=False):
     return database
 
 
+def check_store_access(write=False):
+    """Check local state access without initializing a directory or database."""
+    if sqlite3 is None:
+        raise ValueError("The Python SQLite component is required for local lessons.")
+    root = state_path()
+    try:
+        path = database_path()
+        if path is not None and not os.access(path, os.R_OK):
+            raise ValueError("The software lesson database requires read access.")
+        if not write:
+            return path
+        ancestor = root
+        while not ancestor.exists():
+            ancestor = ancestor.parent
+        if not ancestor.is_dir() or not os.access(ancestor, os.W_OK | os.X_OK):
+            raise ValueError("The software lesson store requires a writable directory.")
+        if path is not None and not os.access(path, os.W_OK):
+            raise ValueError("The software lesson database requires write access.")
+        return path
+    except OSError:
+        raise ValueError("The local software lesson store is unavailable.") from None
+
+
 def record_lesson(kind, observation, suggestion):
     if not isinstance(kind, str) or kind not in KINDS:
         raise ValueError("Choose a software fix or feature.")
     entry = {"kind": kind, "observation": lesson_text(observation), "suggestion": lesson_text(suggestion)}
     identifier = hashlib.sha256(json.dumps(entry, sort_keys=True).encode()).hexdigest()
     try:
+        check_store_access(write=True)
         path = database_path(write=True)
         with closing(sqlite3.connect(str(path), timeout=4)) as database, database:
             database.execute(
@@ -85,13 +115,13 @@ def record_lesson(kind, observation, suggestion):
                 (identifier, entry["kind"], entry["observation"], entry["suggestion"]),
             )
             return {"schemaVersion": 1, "id": identifier, "recorded": cursor.rowcount == 1}
-    except (OSError, sqlite3.Error):
+    except STORAGE_ERRORS:
         raise ValueError("The local software lesson store is unavailable.") from None
 
 
 def suggest_lessons():
     try:
-        path = database_path()
+        path = check_store_access()
         if path is None:
             return {"schemaVersion": 1, "suggestions": []}
         with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=4)) as database:
@@ -102,5 +132,5 @@ def suggest_lessons():
             ).fetchall()
         fields = ("id", "kind", "observation", "suggestion")
         return {"schemaVersion": 1, "suggestions": [dict(zip(fields, row)) for row in rows]}
-    except (OSError, sqlite3.Error):
+    except STORAGE_ERRORS:
         raise ValueError("The local software lesson store is unavailable.") from None
