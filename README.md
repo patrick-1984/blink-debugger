@@ -1,27 +1,91 @@
 # Blink Debugger
 
-Blink Debugger checks Linux host readiness and summarizes local device observation exports. It runs with Python 3.8 or later. Web Blink and AI Minion are optional.
+Blink Debugger checks Linux host readiness and summarizes saved device observations. It runs with Python
+3.8 or later. [Web Blink](https://github.com/patrick-1984/web-blink#use-web-blink-with-blink-debugger) is an
+optional companion for Web Link descriptors. [Release v0.1.2](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.2)
+includes this guide, a plugin ZIP and a Python wheel.
 
 ## Install
 
-In Claude Code, add the owner marketplace, then install the plugin and reload the session.
+In Claude Code, add the owner marketplace and install the plugin.
 
 ```text
 /plugin marketplace add patrick-1984/marketplace
 /plugin install blink-debugger@patrick-1984
 ```
 
-The Codex-compatible package includes the same three MCP tools and the `blink-debugger` skill. Install it from the owner's catalog or use the plugin directly from the [release ZIP](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.1).
-
-For shell use, install the wheel in an isolated environment and run `bdbg --help`. The release ZIP also runs directly with `python3 bdbg.py --help`.
+In Codex, install the same plugin with the CLI.
 
 ```sh
-bdbg doctor
-bdbg inspect-observations examples/observations.jsonl --weblink examples/weblink.json
-bdbg check-listeners
+codex plugin marketplace add patrick-1984/marketplace
+codex plugin add blink-debugger@patrick-1984
 ```
 
-The first two commands are supported through the MCP tools `debugger_doctor` and `debugger_inspect_observations`. When invoking MCP, supply absolute paths to your files. `debugger_check_listeners` provides the host listener check.
+For shell use, activate a virtual environment and install the wheel to get `bdbg`.
+
+```sh
+python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.1.2/blink_debugger-0.1.2-py3-none-any.whl
+```
+
+The ZIP has a standalone script and example files. Download and extract it to try the sample on any Linux host with
+Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.2)
+
+```sh
+base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.1.2
+curl -fLO "$base/blink-debugger-0.1.2.zip"
+curl -fLO "$base/SHA256SUMS"
+sha256sum --ignore-missing -c SHA256SUMS
+python3 -m zipfile -e blink-debugger-0.1.2.zip blink-debugger-0.1.2
+cd blink-debugger-0.1.2
+python3 bdbg.py doctor
+python3 bdbg.py inspect-observations examples/observations.jsonl --weblink examples/weblink.json
+```
+
+The sample contains seven observations across four transport groups. Its report lists counts and UTC time
+bounds, plus the HTTP and Sub-GHz OOK types absent from the example descriptor.
+
+## Common workflows
+
+```mermaid
+flowchart TD
+    accTitle: Common Blink Debugger workflows
+    accDescr: Install the debugger, then check a Linux host or summarize a saved observation file. Web Blink can export the descriptor schema and check peer compatibility on request.
+    install["Install the plugin or CLI"] --> task{"Choose a diagnostic"}
+    task --> host["Check a Linux host"]
+    host --> readiness["Bluetooth adapters and tools on PATH"]
+    host --> listeners["SSH listener check"]
+    readiness -.-> peer["Optional local Web Blink compatibility check"]
+    task --> input["Select a saved JSONL observation file"]
+    input --> inspect["Inspect observations"]
+    schema["Optional Web Link descriptor"] -.-> inspect
+    task -.-> export["Optional: export schema definitions with Web Blink"]
+    inspect --> output["Counts, UTC time bounds and undeclared transport types"]
+```
+
+| Task | CLI | Plugin tool |
+|---|---|---|
+| Check adapters and local tools | `bdbg doctor` | `debugger_doctor` |
+| Check if the host listens only for SSH | `bdbg check-listeners` | `debugger_check_listeners` |
+| Summarize a saved export | `bdbg inspect-observations observations.jsonl` | `debugger_inspect_observations` |
+| Compare with a saved Web Link descriptor | `bdbg inspect-observations observations.jsonl --weblink weblink.json` | `debugger_inspect_observations` with `weblink` |
+| Check the installed Web Blink CLI | `bdbg doctor --probe-web-blink` | `debugger_doctor` with `probeWebBlink` set to true |
+
+Supply absolute file paths to the plugin tools. Use `blink schemas export ./blink-schemas` to export Web
+Blink's schema definitions. The `--weblink` argument accepts a Web Link descriptor such as the bundled
+`examples/weblink.json`.
+
+## Check both peers
+
+Install both CLI wheels so `blink` and `bdbg` are on the same PATH. These commands were introduced in
+Blink Debugger v0.1.1 and Web Blink v0.21.1.
+
+```sh
+bdbg doctor --probe-web-blink
+blink peer discover blink-debugger
+```
+
+The debugger reports the supported descriptor edition. Web Blink reports the installed debugger version.
+[Web Blink installation and peer guide](https://github.com/patrick-1984/web-blink#use-web-blink-with-blink-debugger)
 
 ## Host readiness
 
@@ -48,4 +112,9 @@ The summary reports counts by source, transport and event, plus UTC time bounds.
 
 An optional v1 Web Link descriptor can declare transports using `x-blink-ext.blink-debugger`. The summary lists the declared types and the observed types absent from the declaration. The release test installs the pinned Web Blink v0.21.0 wheel, runs its schema export entry point, validates the example Web Link against the exported descriptor schema and checks the debugger summary. See [the compatibility pin](compat.json).
 
-On Android, supply app-owned observations through the app's supported export when available. A Minion Android export integration needs a documented export capability. For Home Assistant use the supported integration for the exact device, firmware and bridge. A state read requires a compatible bench device and test instance.
+## AI Minion and device integrations
+
+[AI Minion](https://github.com/patrick-1984/ai-minion/releases) has its own release history. The debugger's
+host check reports whether `minion` is on PATH. A Minion Android integration requires a documented app-owned
+export. A live Home Assistant check requires the supported integration for the exact device, firmware and
+bridge, and an available test instance.
