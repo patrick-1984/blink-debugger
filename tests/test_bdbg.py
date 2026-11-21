@@ -32,7 +32,7 @@ class CapabilityTests(unittest.TestCase):
 class PeerTests(unittest.TestCase):
     def test_debugger_capability_response(self):
         self.assertEqual(capabilities(), {
-            "schemaVersion": 1, "product": "blink-debugger", "version": "0.1.2",
+            "schemaVersion": 1, "product": "blink-debugger", "version": "0.2.0",
             "webLink": {"descriptor": "urn:web-blink:schema:weblink:1", "transportExtensionVersion": 1},
         })
 

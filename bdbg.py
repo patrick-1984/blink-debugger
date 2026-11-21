@@ -18,7 +18,7 @@ import threading
 import time
 
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 
 SSH_PROCESSES = {"sshd", "sshd-session", "dropbear"}
@@ -295,6 +295,13 @@ def main():
     doctor = subcommands.add_parser("doctor", help="inspect host Bluetooth adapters and commands on PATH")
     doctor.add_argument("--probe-web-blink", action="store_true", help="query the local Web Blink schema index")
     subcommands.add_parser("capabilities", help="describe this executable's supported Web Link descriptor")
+    lessons = subcommands.add_parser("lessons", help="save and retrieve reusable software improvement notes")
+    actions = lessons.add_subparsers(dest="lesson_action", required=True)
+    record = actions.add_parser("record", help="record a generalized software lesson")
+    record.add_argument("--kind", choices=("fix", "feature"), required=True)
+    record.add_argument("--observation", required=True, help="short generalized software observation")
+    record.add_argument("--suggestion", required=True, help="specific suggested plugin improvement")
+    actions.add_parser("suggest", help="show recent locally saved software suggestions")
     trace = subcommands.add_parser("inspect-observations", help="summarize a local JSON Lines export")
     trace.add_argument("file", help="file path or - for stdin")
     trace.add_argument("--weblink", help="compare observed transport types with a local Web Link descriptor")
@@ -321,6 +328,11 @@ def main():
             exit_code = 0
         elif args.command == "capabilities":
             result = capabilities()
+            exit_code = 0
+        elif args.command == "lessons":
+            from bdbg_lessons import record_lesson, suggest_lessons
+            result = (record_lesson(args.kind, args.observation, args.suggestion)
+                      if args.lesson_action == "record" else suggest_lessons())
             exit_code = 0
         else:
             source = contextlib.nullcontext(sys.stdin.buffer) if args.file == "-" else open(args.file, "rb")

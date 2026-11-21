@@ -9,6 +9,7 @@ import sys
 CLI = Path(__file__).resolve().parents[1] / "bdbg.py"
 sys.path.insert(0, str(CLI.parent))
 from bdbg import __version__
+from bdbg_lessons import KINDS, TEXT_LIMIT, record_lesson, suggest_lessons
 
 
 PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
@@ -22,6 +23,12 @@ TOOLS = (
      {"file": {"type": "string", "description": "Absolute path to the observation file."},
       "weblink": {"type": "string", "description": "Optional absolute path to a Web Link descriptor."}},
      ("file",)),
+    ("debugger_record_lesson", "Save a generalized, local software improvement lesson.",
+     {"kind": {"type": "string", "enum": KINDS},
+      "observation": {"type": "string", "maxLength": TEXT_LIMIT},
+      "suggestion": {"type": "string", "maxLength": TEXT_LIMIT}},
+     ("kind", "observation", "suggestion")),
+    ("debugger_suggest_lessons", "Read recent locally saved software improvement suggestions.", {}, ()),
 )
 TOOL_SPECS = {tool[0]: (tool[2], tool[3]) for tool in TOOLS}
 
@@ -32,7 +39,12 @@ def descriptors():
         "description": description,
         "inputSchema": {"type": "object", "properties": properties, "required": required,
                         "additionalProperties": False},
-        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False},
+        "annotations": {
+            "readOnlyHint": name != "debugger_record_lesson",
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
     } for name, description, properties, required in TOOLS]
 
 
@@ -45,7 +57,7 @@ def local_file(value):
     return value
 
 
-def arguments_for(name, parameters):
+def require_parameters(name, parameters):
     if name not in TOOL_SPECS:
         raise ValueError("Unknown Blink Debugger tool.")
     properties, required = TOOL_SPECS[name]
@@ -53,6 +65,8 @@ def arguments_for(name, parameters):
             or any(key not in parameters for key in required)):
         raise ValueError("Invalid tool arguments.")
 
+
+def arguments_for(name, parameters):
     if name == "debugger_doctor":
         probe = parameters.get("probeWebBlink", False)
         if type(probe) is not bool:
@@ -72,15 +86,21 @@ def arguments_for(name, parameters):
 
 def run_tool(name, parameters):
     try:
-        arguments = arguments_for(name, parameters)
-        result = subprocess.run(
-            [sys.executable, str(CLI), *arguments],
-            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15,
-        )
-        if not result.stdout:
-            raise ValueError(result.stderr.strip()[:500] or "Blink Debugger did not return a result.")
-        # The listener command uses nonzero exit codes for valid diagnostics.
-        summary = json.loads(result.stdout)
+        require_parameters(name, parameters)
+        if name == "debugger_record_lesson":
+            summary = record_lesson(**parameters)
+        elif name == "debugger_suggest_lessons":
+            summary = suggest_lessons()
+        else:
+            arguments = arguments_for(name, parameters)
+            result = subprocess.run(
+                [sys.executable, str(CLI), *arguments],
+                stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15,
+            )
+            if not result.stdout:
+                raise ValueError(result.stderr.strip()[:500] or "Blink Debugger did not return a result.")
+            # The listener command uses nonzero exit codes for valid diagnostics.
+            summary = json.loads(result.stdout)
         return {"content": [{"type": "text", "text": json.dumps(summary)}]}
     except (OSError, subprocess.SubprocessError, TypeError, ValueError) as exc:
         return {"isError": True, "content": [{"type": "text", "text": str(exc)[:500]}]}
