@@ -25,3 +25,5 @@ printf '%s  %s\n' "$peer_hash" "$work/$peer_wheel" | sha256sum -c
 "$work/runtime/bin/blink" --version
 "$work/runtime/bin/blink" schemas export "$work/peer-schemas"
 "$work/runtime/bin/python" scripts/verify_weblink.py "$work/plugin" "$work/peer-schemas"
+PATH="$work/runtime/bin" "$work/runtime/bin/bdbg" doctor --probe-web-blink \
+    | "$work/runtime/bin/python" -c 'import json,sys; r=json.load(sys.stdin)["webBlinkPeer"]; print(r); assert r == {"status":"compatible","descriptor":"urn:web-blink:schema:weblink:1","descriptorSchema":"1.3.0"}'

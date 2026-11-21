@@ -11,7 +11,7 @@ In Claude Code, add the owner marketplace, then install the plugin and reload th
 /plugin install blink-debugger@patrick-1984
 ```
 
-The Codex-compatible package includes the same three MCP tools and the `blink-debugger` skill. Install it from the owner's catalog or use the plugin directly from the [release ZIP](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.0).
+The Codex-compatible package includes the same three MCP tools and the `blink-debugger` skill. Install it from the owner's catalog or use the plugin directly from the [release ZIP](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.1).
 
 For shell use, install the wheel in an isolated environment and run `bdbg --help`. The release ZIP also runs directly with `python3 bdbg.py --help`.
 
@@ -26,6 +26,10 @@ The first two commands are supported through the MCP tools `debugger_doctor` and
 ## Host readiness
 
 `doctor` lists Linux Bluetooth adapters registered by the kernel and finds `minion`, `blink` or `web-blink`, `rtl_433` and `ss` on the current PATH. A command name on PATH is evidence of executable discovery. Use its documented version or capability command if your workflow requires compatibility. Bluetooth registration alone does not establish successful pairing or GATT. The plugin checks the host on which it runs.
+
+Use `bdbg doctor --probe-web-blink` to query the local Web Blink schema index. In MCP, set `probeWebBlink` to true on `debugger_doctor`. The probe reports `missing` when the executable is absent, `unavailable` when the command or its reply fails, and `compatible` for the tested descriptor edition 1.3.0. A different descriptor edition or index contract is `incompatible`. The check uses a fixed local CLI command, a five-second deadline and a 64 KiB response limit.
+
+`bdbg capabilities` describes the Web Link descriptor and transport extension supported by the installed debugger. Web Blink can read it through that fixed CLI command. The response identifies the debugger version and the supported descriptor without probing hardware.
 
 `check-listeners` checks TCP and UDP bindings in the current Linux network namespace with `ss`. Run it with sufficient socket owner visibility. It excludes loopback, accepts attributable SSH listeners on TCP 22 by default, and reports unexpected bindings. Use `--ssh-port` if this host uses another port. Exit 0 means pass, 1 means unexpected bindings, and 2 means incomplete attribution or an execution error. Routing and firewall rules determine reachability.
 

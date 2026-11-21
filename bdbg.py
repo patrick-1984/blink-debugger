@@ -7,14 +7,18 @@ import contextlib
 import datetime
 import ipaddress
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 SSH_PROCESSES = {"sshd", "sshd-session", "dropbear"}
@@ -36,6 +40,11 @@ TRACE_FIELDS = {"schemaVersion", "observedAt", "source", "kind", "subtype", "eve
 MAX_LINE_BYTES = 1024
 MAX_OBSERVATIONS = 100_000
 MAX_DESCRIPTOR_BYTES = 2 * 1024 * 1024
+WEB_LINK_SCHEMA = "urn:web-blink:schema:weblink:1"
+WEB_LINK_EDITION = "1.3.0"
+TRANSPORT_EXTENSION_VERSION = 1
+PEER_OUTPUT_LIMIT = 64 * 1024
+PEER_TIMEOUT = 5
 
 
 def host_capabilities(bluetooth_devices):
@@ -58,6 +67,90 @@ def host_capabilities(bluetooth_devices):
             "listenerCheck": shutil.which("ss") is not None,
         },
     }
+
+
+def capabilities():
+    return {
+        "schemaVersion": 1,
+        "product": "blink-debugger",
+        "version": __version__,
+        "webLink": {
+            "descriptor": WEB_LINK_SCHEMA,
+            "transportExtensionVersion": TRANSPORT_EXTENSION_VERSION,
+        },
+    }
+
+
+def read_peer_index(executable):
+    # Web Blink loads settings even for a schema query. Give the child an
+    # absent settings directory so the probe never touches operator settings.
+    with tempfile.TemporaryDirectory(prefix="bdbg-peer-") as scratch:
+        environment = dict(os.environ, BLINK_CONFIG_DIR=str(Path(scratch) / "settings"), BLINK_OUTPUT="json")
+        deadline = time.monotonic() + PEER_TIMEOUT
+        output = bytearray()
+        failed = threading.Event()
+        process = subprocess.Popen(
+            [executable, "schemas", "--json"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            bufsize=0, env=environment,
+        )
+
+        def drain():
+            try:
+                while len(output) <= PEER_OUTPUT_LIMIT:
+                    chunk = process.stdout.read(min(4096, PEER_OUTPUT_LIMIT + 1 - len(output)))
+                    if not chunk:
+                        return
+                    output.extend(chunk)
+            except OSError:
+                failed.set()
+
+        reader = threading.Thread(target=drain, daemon=True)
+        try:
+            reader.start()
+            reader.join(timeout=max(0, deadline - time.monotonic()))
+            if reader.is_alive() or failed.is_set() or len(output) > PEER_OUTPUT_LIMIT:
+                raise ValueError("Peer output unavailable or exceeds limits")
+            if process.wait(timeout=max(0, deadline - time.monotonic())):
+                raise ValueError("Peer command failed")
+            return json.loads(output, object_pairs_hook=unique_fields)
+        finally:
+            if process.poll() is None:
+                with contextlib.suppress(ProcessLookupError):
+                    process.kill()
+            process.stdout.close()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=0.25)
+
+
+def web_blink_peer():
+    executable = shutil.which("web-blink") or shutil.which("blink")
+    if executable is None:
+        return {"status": "missing"}
+    try:
+        response = read_peer_index(executable)
+        data = response["data"]
+        if (response["status"] != "ok" or type(data["schemaVersion"]) is not int
+                or not isinstance(data["schemas"], list)
+                or not all(isinstance(schema, dict) for schema in data["schemas"])):
+            raise ValueError("Invalid peer schema index")
+        if data["schemaVersion"] != 1:
+            return {"status": "incompatible"}
+        entries = [schema for schema in data["schemas"] if schema.get("id") == WEB_LINK_SCHEMA]
+        if not entries:
+            return {"status": "incompatible"}
+        if len(entries) != 1:
+            raise ValueError("Duplicate peer descriptor")
+        edition = entries[0]["version"]
+        if not isinstance(edition, str) or re.fullmatch(r"[0-9]{1,4}(\.[0-9]{1,4}){2}", edition) is None:
+            raise ValueError("Invalid peer descriptor edition")
+        return {
+            "status": "compatible" if edition == WEB_LINK_EDITION else "incompatible",
+            "descriptor": WEB_LINK_SCHEMA,
+            "descriptorSchema": edition,
+        }
+    except (AttributeError, KeyError, OSError, RecursionError, subprocess.SubprocessError, TypeError, ValueError):
+        return {"status": "unavailable"}
 
 
 def check_listeners(lines, ssh_port):
@@ -173,10 +266,10 @@ def read_weblink_transports(stream):
         raise ValueError("Web Link descriptor exceeds the byte limit")
     try:
         descriptor = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_fields)
-        if descriptor["$schema"] != "urn:web-blink:schema:weblink:1":
+        if descriptor["$schema"] != WEB_LINK_SCHEMA:
             raise ValueError("unsupported Web Link schema")
         metadata = descriptor["x-blink-ext"]["blink-debugger"]
-        if set(metadata) != {"version", "transports"} or metadata["version"] != 1 or metadata["version"] is True:
+        if set(metadata) != {"version", "transports"} or metadata["version"] != TRANSPORT_EXTENSION_VERSION or metadata["version"] is True:
             raise ValueError("unsupported transport metadata version")
         transports = metadata["transports"]
         if not isinstance(transports, dict) or not transports or not transports.keys() <= TRANSPORTS.keys():
@@ -199,7 +292,9 @@ def main():
     subcommands = parser.add_subparsers(dest="command", required=True)
     check = subcommands.add_parser("check-listeners", help="check the host's TCP and UDP listeners")
     check.add_argument("--ssh-port", type=int, metavar="PORT", default=22)
-    subcommands.add_parser("doctor", help="inspect host Bluetooth adapters and commands on PATH")
+    doctor = subcommands.add_parser("doctor", help="inspect host Bluetooth adapters and commands on PATH")
+    doctor.add_argument("--probe-web-blink", action="store_true", help="query the local Web Blink schema index")
+    subcommands.add_parser("capabilities", help="describe this executable's supported Web Link descriptor")
     trace = subcommands.add_parser("inspect-observations", help="summarize a local JSON Lines export")
     trace.add_argument("file", help="file path or - for stdin")
     trace.add_argument("--weblink", help="compare observed transport types with a local Web Link descriptor")
@@ -221,6 +316,11 @@ def main():
         elif args.command == "doctor":
             devices = Path("/sys/class/bluetooth") if sys.platform.startswith("linux") else None
             result = host_capabilities(devices)
+            if args.probe_web_blink:
+                result["webBlinkPeer"] = web_blink_peer()
+            exit_code = 0
+        elif args.command == "capabilities":
+            result = capabilities()
             exit_code = 0
         else:
             source = contextlib.nullcontext(sys.stdin.buffer) if args.file == "-" else open(args.file, "rb")
