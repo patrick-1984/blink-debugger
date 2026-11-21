@@ -14,3 +14,9 @@ An Android or Home Assistant workflow needs its documented integration and devic
 When the user asks you to learn from a software workflow or improve how the debugger works, follow
 the packaged `blink-debugger-learning` workflow. Record generalized software lessons only. Surface
 relevant suggested plugin fixes or features after a major change and when work finishes.
+
+For an authorized Orange Pi bench with the separate `hl-wifi-prov` helper, the operator starts the
+dedicated open `web-debug` network using `sudo hl-wifi-prov lab-ap --confirm` from the host shell.
+It is off by default and the helper expires it after 30 minutes. The operator can stop it with
+`sudo hl-wifi-prov down`. Use the debugger's read-only diagnostics and saved observation inspector
+independently of these operator commands. Treat live wireless association as a separate fixture check.

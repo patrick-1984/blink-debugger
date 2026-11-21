@@ -2,7 +2,7 @@
 
 Blink Debugger checks Linux host readiness and summarizes saved device observations. It runs with Python
 3.8 or later. [Web Blink](https://github.com/patrick-1984/web-blink#use-web-blink-with-blink-debugger) is an
-optional companion for Web Link descriptors. [Release v0.2.0](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.0)
+optional companion for Web Link descriptors. [Release v0.2.1](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.1)
 includes this guide, a plugin ZIP and a Python wheel.
 
 ## Install
@@ -24,19 +24,19 @@ codex plugin add blink-debugger@patrick-1984
 For shell use, activate a virtual environment and install the wheel to get `bdbg`.
 
 ```sh
-python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.0/blink_debugger-0.2.0-py3-none-any.whl
+python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.1/blink_debugger-0.2.1-py3-none-any.whl
 ```
 
 The ZIP has a standalone script and example files. Download and extract it to try the sample on any Linux host with
-Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.0)
+Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.1)
 
 ```sh
-base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.0
-curl -fLO "$base/blink-debugger-0.2.0.zip"
+base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.1
+curl -fLO "$base/blink-debugger-0.2.1.zip"
 curl -fLO "$base/SHA256SUMS"
 sha256sum --ignore-missing -c SHA256SUMS
-python3 -m zipfile -e blink-debugger-0.2.0.zip blink-debugger-0.2.0
-cd blink-debugger-0.2.0
+python3 -m zipfile -e blink-debugger-0.2.1.zip blink-debugger-0.2.1
+cd blink-debugger-0.2.1
 python3 bdbg.py doctor
 python3 bdbg.py inspect-observations examples/observations.jsonl --weblink examples/weblink.json
 ```
@@ -96,6 +96,24 @@ Use `bdbg doctor --probe-web-blink` to query the local Web Blink schema index. I
 `bdbg capabilities` describes the Web Link descriptor and transport extension supported by the installed debugger. Web Blink can read it through that fixed CLI command. The response identifies the debugger version and the supported descriptor without probing hardware.
 
 `check-listeners` checks TCP and UDP bindings in the current Linux network namespace with `ss`. Run it with sufficient socket owner visibility. It excludes loopback, accepts attributable SSH listeners on TCP 22 by default, and reports unexpected bindings. Use `--ssh-port` if this host uses another port. Exit 0 means pass, 1 means unexpected bindings, and 2 means incomplete attribution or an execution error. Routing and firewall rules determine reachability.
+
+## Optional Orange Pi bench network
+
+On a prepared Orange Pi with the separate `hl-wifi-prov` helper, the operator can start the dedicated open
+`web-debug` access point from an authorized shell. The bench interface is down by default.
+
+```sh
+sudo hl-wifi-prov lab-ap --confirm
+```
+
+Check its state with `sudo hl-wifi-prov status`. When finished, run `sudo hl-wifi-prov down`.
+
+The helper sets a 30-minute maximum, configures client isolation, allows DHCP on the bench interface
+and denies IPv4 and IPv6 forwarding. Use trusted bench devices. The timer and cleanup were verified on
+the host. Treat wireless association as a separate fixture check.
+
+Blink Debugger's tools inspect local readiness and saved observations. The operator manages the optional
+access point through the separate host helper.
 
 ## Device observations
 
