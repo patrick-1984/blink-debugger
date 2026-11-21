@@ -10,3 +10,7 @@ Use the Blink Debugger MCP tools:
 - `debugger_check_listeners` checks the current Linux network namespace and classifies the result as pass, fail or indeterminate. Report unexpected bindings and missing attribution. Firewall reachability requires a separate check.
 
 An Android or Home Assistant workflow needs its documented integration and device evidence. Use an Android export that the operator explicitly generated or the data returned by the device's supported Home Assistant integration. The plugin's tools run on the machine that hosts the MCP server.
+
+When the user asks you to learn from a software workflow or improve how the debugger works, follow
+the packaged `blink-debugger-learning` workflow. Record generalized software lessons only. Surface
+relevant suggested plugin fixes or features after a major change and when work finishes.

@@ -76,7 +76,10 @@ responses = invoke_mcp([
 assert responses[0]["result"]["protocolVersion"] == "2025-06-18"
 assert responses[0]["result"]["serverInfo"]["version"] == version
 assert run_cli("--version").stdout.strip() == f"bdbg {version}"
-assert len(responses[1]["result"]["tools"]) == 3
+tool_specs = {tool["name"]: tool for tool in responses[1]["result"]["tools"]}
+assert len(tool_specs) == 5
+assert tool_specs["debugger_record_lesson"]["annotations"]["readOnlyHint"] is False
+assert tool_specs["debugger_suggest_lessons"]["annotations"]["readOnlyHint"] is True
 assert tool_mcp(responses[2]) == json.loads(doctor.stdout)
 assert tool_mcp(responses[3]) == summary
 assert responses[4]["result"]["isError"] is True
@@ -105,4 +108,42 @@ with tempfile.TemporaryDirectory() as temporary:
         ], env=env)[0]
         assert tool_mcp(response) == json.loads(result.stdout)
 
+assert (plugin / "AGENTS.md").is_file()
+assert (plugin / "skills/blink-debugger-learning/SKILL.md").is_file()
+
+with tempfile.TemporaryDirectory() as temporary:
+    state = Path(temporary) / "state"
+    env = dict(os.environ, BLINK_DEBUGGER_STATE_DIR=str(state))
+    first_read = invoke_mcp([request(11, "tools/call", name="debugger_suggest_lessons")], env=env)[0]
+    assert tool_mcp(first_read) == {"schemaVersion": 1, "suggestions": []}
+    assert not state.exists()
+    note = {
+        "kind": "fix",
+        "observation": "Incomplete listener ownership needs a clearer explanation",
+        "suggestion": "Show why listener ownership was indeterminate",
+    }
+    first_run = invoke_mcp([
+        request(12, "tools/call", name="debugger_record_lesson", arguments=note),
+        request(13, "tools/call", name="debugger_record_lesson",
+                arguments={**note, "observation": "Device address 10.0.0.1"}),
+    ], env=env)
+    assert tool_mcp(first_run[0])["recorded"] is True
+    assert first_run[1]["result"]["isError"] is True
+    identifier = tool_mcp(first_run[0])["id"]
+
+    next_run = invoke_mcp([
+        request(14, "tools/call", name="debugger_record_lesson", arguments=note),
+        request(15, "tools/call", name="debugger_suggest_lessons"),
+    ], env=env)
+    assert tool_mcp(next_run[0]) == {"schemaVersion": 1, "id": identifier, "recorded": False}
+    expected = {"schemaVersion": 1, "suggestions": [{"id": identifier, **note}]}
+    assert tool_mcp(next_run[1]) == expected
+    later_cli = run_cli("lessons", "suggest", env=env)
+    assert later_cli.returncode == 0, later_cli.stderr
+    assert json.loads(later_cli.stdout) == expected
+    if os.name == "posix":
+        assert state.stat().st_mode & 0o777 == 0o700
+        assert (state / "software-lessons.sqlite3").stat().st_mode & 0o777 == 0o600
+
+print("Installed MCP preserved a generalized lesson across sessions and surfaced its suggested fix via MCP and CLI.")
 print("Fresh wheel CLI and ZIP MCP passed with both peers absent. All three listener outcomes passed.")

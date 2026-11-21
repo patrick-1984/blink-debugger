@@ -2,7 +2,7 @@
 
 Blink Debugger checks Linux host readiness and summarizes saved device observations. It runs with Python
 3.8 or later. [Web Blink](https://github.com/patrick-1984/web-blink#use-web-blink-with-blink-debugger) is an
-optional companion for Web Link descriptors. [Release v0.1.2](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.2)
+optional companion for Web Link descriptors. [Release v0.2.0](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.0)
 includes this guide, a plugin ZIP and a Python wheel.
 
 ## Install
@@ -24,19 +24,19 @@ codex plugin add blink-debugger@patrick-1984
 For shell use, activate a virtual environment and install the wheel to get `bdbg`.
 
 ```sh
-python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.1.2/blink_debugger-0.1.2-py3-none-any.whl
+python3 -m pip install https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.0/blink_debugger-0.2.0-py3-none-any.whl
 ```
 
 The ZIP has a standalone script and example files. Download and extract it to try the sample on any Linux host with
-Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.1.2)
+Python 3.8 or later. [Release files and SHA256SUMS](https://github.com/patrick-1984/blink-debugger/releases/tag/v0.2.0)
 
 ```sh
-base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.1.2
-curl -fLO "$base/blink-debugger-0.1.2.zip"
+base=https://github.com/patrick-1984/blink-debugger/releases/download/v0.2.0
+curl -fLO "$base/blink-debugger-0.2.0.zip"
 curl -fLO "$base/SHA256SUMS"
 sha256sum --ignore-missing -c SHA256SUMS
-python3 -m zipfile -e blink-debugger-0.1.2.zip blink-debugger-0.1.2
-cd blink-debugger-0.1.2
+python3 -m zipfile -e blink-debugger-0.2.0.zip blink-debugger-0.2.0
+cd blink-debugger-0.2.0
 python3 bdbg.py doctor
 python3 bdbg.py inspect-observations examples/observations.jsonl --weblink examples/weblink.json
 ```
@@ -118,3 +118,22 @@ An optional v1 Web Link descriptor can declare transports using `x-blink-ext.bli
 host check reports whether `minion` is on PATH. A Minion Android integration requires a documented app-owned
 export. A live Home Assistant check requires the supported integration for the exact device, firmware and
 bridge, and an available test instance.
+
+## Learn from software work
+
+Ask the installed `blink-debugger-learning` skill to learn from a diagnostic or software improvement
+task. It stores reusable software observations and proposed fixes or features on the machine running the
+plugin. It can surface relevant suggestions after a major change or at completion, including in a later
+session.
+
+```sh
+bdbg lessons record --kind fix \
+  --observation "A listener result with incomplete ownership needs a clearer explanation" \
+  --suggestion "Show why listener ownership was indeterminate"
+bdbg lessons suggest
+```
+
+The corresponding MCP tools are `debugger_record_lesson` and `debugger_suggest_lessons`. Use
+generalized prose without device commands, logs, payloads, credentials or user-specific data.
+By default Linux stores notes in `$XDG_STATE_HOME/blink-debugger` or `~/.local/state/blink-debugger` when
+that variable is unset. [Agent guidance](AGENTS.md) describes when to record and surface a suggestion.
