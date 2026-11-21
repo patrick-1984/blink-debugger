@@ -77,7 +77,7 @@ assert responses[0]["result"]["protocolVersion"] == "2025-06-18"
 assert responses[0]["result"]["serverInfo"]["version"] == version
 assert run_cli("--version").stdout.strip() == f"bdbg {version}"
 tool_specs = {tool["name"]: tool for tool in responses[1]["result"]["tools"]}
-assert len(tool_specs) == 5
+assert len(tool_specs) == 7
 assert tool_specs["debugger_record_lesson"]["annotations"]["readOnlyHint"] is False
 assert tool_specs["debugger_suggest_lessons"]["annotations"]["readOnlyHint"] is True
 assert tool_mcp(responses[2]) == json.loads(doctor.stdout)
@@ -86,6 +86,27 @@ assert responses[4]["result"]["isError"] is True
 assert responses[5]["result"]["isError"] is True
 assert tool_mcp(responses[6])["webBlinkPeer"] == {"status": "missing"}
 assert responses[7]["result"]["isError"] is True
+
+known_flows = json.loads(run_cli("preflight").stdout)["flows"]
+assert len(known_flows) == 10
+assert "kvm" in known_flows and "lesson-record" in known_flows
+assert json.loads(run_cli("preflight", "doctor").stdout)["status"] == "ready"
+missing = run_cli("preflight", "check-listeners")
+assert missing.returncode == 1
+assert any(item["name"] == "ss" and item["status"] == "missing" for item in json.loads(missing.stdout)["checks"])
+assert run_cli("check-listeners").returncode == 2
+kvm = run_cli("runbook", "kvm")
+assert kvm.returncode == 1 and json.loads(kvm.stdout)["steps"]
+flow_results = invoke_mcp([
+    request(9, "tools/call", name="debugger_preflight",
+            arguments={"flow": "inspect-observations", "file": observations, "weblink": descriptor}),
+    request(16, "tools/call", name="debugger_preflight",
+            arguments={"flow": "inspect-observations", "file": str(plugin / "missing.jsonl")}),
+    request(17, "tools/call", name="debugger_runbook", arguments={"flow": "kvm"}),
+])
+assert tool_mcp(flow_results[0])["status"] == "ready"
+assert tool_mcp(flow_results[1])["status"] == "blocked"
+assert tool_mcp(flow_results[2]) == json.loads(kvm.stdout)
 
 ss_input = 'tcp LISTEN 0 128 0.0.0.0:2222 0.0.0.0:* users:(("sshd",pid=1,fd=4))'
 unexpected = 'udp UNCONN 0 0 0.0.0.0:100 0.0.0.0:* users:(("other",pid=2,fd=4))'

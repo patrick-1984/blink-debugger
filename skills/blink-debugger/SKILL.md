@@ -3,6 +3,14 @@ name: blink-debugger
 description: Summarize an operator-selected local device observation export, identify local host prerequisites, or check whether host listeners are limited to SSH.
 ---
 
+Start every supported flow with `debugger_preflight`, even when the user names it only in general
+terms. Omit the flow to see the available choices. Include the selected local inputs when inspecting
+observations. Report missing required components and unresolved verification steps before running any
+diagnostic. Request `debugger_runbook` to read the matching workflow. Use a board profile only after the
+operator has independently confirmed the PCB revision and the reported local board family matches.
+Treat a blocked manual workflow as evidence for the operator to review. Keep device, network and role
+changes in the separate operator workflow.
+
 Use the Blink Debugger MCP tools:
 
 - `debugger_doctor` reports registered Bluetooth adapters and executable names found on the server's PATH. Report which peer commands were found. When asked to check Web Blink compatibility, set `probeWebBlink` to true and report the resulting descriptor edition and status.
@@ -16,7 +24,7 @@ the packaged `blink-debugger-learning` workflow. Record generalized software les
 relevant suggested plugin fixes or features after a major change and when work finishes.
 
 For an authorized Orange Pi bench with the separate `hl-wifi-prov` helper, the operator starts the
-dedicated open `web-debug` network using `sudo hl-wifi-prov lab-ap --confirm` from the host shell.
+dedicated open `web-debug` network using `sudo /usr/local/sbin/hl-wifi-prov lab-ap --confirm` from the host shell.
 It is off by default and the helper expires it after 30 minutes. The operator can stop it with
-`sudo hl-wifi-prov down`. Use the debugger's read-only diagnostics and saved observation inspector
+`sudo /usr/local/sbin/hl-wifi-prov down`. Use the debugger's read-only diagnostics and saved observation inspector
 independently of these operator commands. Treat live wireless association as a separate fixture check.

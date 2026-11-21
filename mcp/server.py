@@ -10,10 +10,18 @@ CLI = Path(__file__).resolve().parents[1] / "bdbg.py"
 sys.path.insert(0, str(CLI.parent))
 from bdbg import __version__
 from bdbg_lessons import KINDS, TEXT_LIMIT, record_lesson, suggest_lessons
+from bdbg_preflight import PROFILE, RUNBOOKS, describe_flow
 
 
 PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
 MAX_REQUEST = 1024 * 1024
+FLOW_PARAMETERS = {
+    "flow": {"type": "string", "enum": list(RUNBOOKS), "description": "Omit for available flows."},
+    "file": {"type": "string", "description": "Absolute observation file path for inspection."},
+    "weblink": {"type": "string", "description": "Optional absolute Web Link descriptor path."},
+    "boardProfile": {"type": "string", "enum": [PROFILE],
+                     "description": "Use after independently confirming the physical board revision."},
+}
 TOOLS = (
     ("debugger_doctor", "Check registered Bluetooth adapters and executable discovery on this host.",
      {"probeWebBlink": {"type": "boolean", "description": "Query the local Web Blink schema index."}}, ()),
@@ -29,6 +37,8 @@ TOOLS = (
       "suggestion": {"type": "string", "maxLength": TEXT_LIMIT}},
      ("kind", "observation", "suggestion")),
     ("debugger_suggest_lessons", "Read recent locally saved software improvement suggestions.", {}, ()),
+    ("debugger_preflight", "Check local prerequisites before any supported debugger workflow.", FLOW_PARAMETERS, ()),
+    ("debugger_runbook", "Read the workflow and applicable board-specific guidance.", FLOW_PARAMETERS, ()),
 )
 TOOL_SPECS = {tool[0]: (tool[2], tool[3]) for tool in TOOLS}
 
@@ -48,13 +58,19 @@ def descriptors():
     } for name, description, properties, required in TOOLS]
 
 
-def local_file(value):
+def local_path(value):
     if not isinstance(value, str) or "\x00" in value or len(value) > 4096:
         raise ValueError("Supply an absolute path to a local file.")
-    path = Path(value)
-    if not path.is_absolute() or not path.is_file():
-        raise ValueError("Supply an absolute path to an existing local file.")
+    if not Path(value).is_absolute():
+        raise ValueError("Supply an absolute path to a local file.")
     return value
+
+
+def local_file(value):
+    path = local_path(value)
+    if not Path(path).is_file():
+        raise ValueError("Supply an absolute path to an existing local file.")
+    return path
 
 
 def require_parameters(name, parameters):
@@ -91,6 +107,14 @@ def run_tool(name, parameters):
             summary = record_lesson(**parameters)
         elif name == "debugger_suggest_lessons":
             summary = suggest_lessons()
+        elif name in {"debugger_preflight", "debugger_runbook"}:
+            summary = describe_flow(
+                parameters.get("flow"),
+                file=local_path(parameters["file"]) if "file" in parameters else None,
+                weblink=local_path(parameters["weblink"]) if "weblink" in parameters else None,
+                board_profile=parameters.get("boardProfile"),
+                include_runbook=name == "debugger_runbook",
+            )
         else:
             arguments = arguments_for(name, parameters)
             result = subprocess.run(
