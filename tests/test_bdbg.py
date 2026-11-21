@@ -72,6 +72,8 @@ class PeerTests(unittest.TestCase):
                 executable.write_text(
                     f"#!{sys.executable}\nimport os, sys\n"
                     "assert sys.argv[1:] == ['schemas', '--json']\n"
+                    "assert os.environ['BLINK_OUTPUT'] == 'json'\n"
+                    "assert not os.path.exists(os.environ['BLINK_CONFIG_DIR'])\n"
                     f"print({json.dumps(body)!r})\n"
                 )
                 self.assertEqual(web_blink_peer()["status"], "compatible")
