@@ -43,6 +43,12 @@ def tool_mcp(response):
 
 doctor = run_cli("doctor")
 assert doctor.returncode == 0, doctor.stderr
+assert "webBlinkPeer" not in json.loads(doctor.stdout)
+assert json.loads(run_cli("doctor", "--probe-web-blink").stdout)["webBlinkPeer"] == {"status": "missing"}
+assert json.loads(run_cli("capabilities").stdout) == {
+    "schemaVersion": 1, "product": "blink-debugger", "version": version,
+    "webLink": {"descriptor": "urn:web-blink:schema:weblink:1", "transportExtensionVersion": 1},
+}
 assert json.loads(doctor.stdout)["commandsOnPath"] == {
     "aiMinion": False, "webBlink": False, "radioReceiver": False, "listenerCheck": False,
 }
@@ -64,6 +70,8 @@ responses = invoke_mcp([
             arguments={"file": observations, "weblink": descriptor}),
     request(5, "tools/call", name="debugger_inspect_observations", arguments={"file": "-"}),
     request(6, "tools/call", name="debugger_doctor", arguments={"command": "other"}),
+    request(7, "tools/call", name="debugger_doctor", arguments={"probeWebBlink": True}),
+    request(8, "tools/call", name="debugger_doctor", arguments={"probeWebBlink": "true"}),
 ])
 assert responses[0]["result"]["protocolVersion"] == "2025-06-18"
 assert responses[0]["result"]["serverInfo"]["version"] == version
@@ -73,6 +81,8 @@ assert tool_mcp(responses[2]) == json.loads(doctor.stdout)
 assert tool_mcp(responses[3]) == summary
 assert responses[4]["result"]["isError"] is True
 assert responses[5]["result"]["isError"] is True
+assert tool_mcp(responses[6])["webBlinkPeer"] == {"status": "missing"}
+assert responses[7]["result"]["isError"] is True
 
 ss_input = 'tcp LISTEN 0 128 0.0.0.0:2222 0.0.0.0:* users:(("sshd",pid=1,fd=4))'
 unexpected = 'udp UNCONN 0 0 0.0.0.0:100 0.0.0.0:* users:(("other",pid=2,fd=4))'

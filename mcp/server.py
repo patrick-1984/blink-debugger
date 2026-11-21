@@ -14,7 +14,8 @@ from bdbg import __version__
 PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
 MAX_REQUEST = 1024 * 1024
 TOOLS = (
-    ("debugger_doctor", "Check registered Bluetooth adapters and executable discovery on this host.", {}, ()),
+    ("debugger_doctor", "Check registered Bluetooth adapters and executable discovery on this host.",
+     {"probeWebBlink": {"type": "boolean", "description": "Query the local Web Blink schema index."}}, ()),
     ("debugger_check_listeners", "Read TCP and UDP listener state in this Linux network namespace.",
      {"sshPort": {"type": "integer", "minimum": 1, "maximum": 65535}}, ()),
     ("debugger_inspect_observations", "Summarize an operator-selected local JSON Lines observation export.",
@@ -53,7 +54,10 @@ def arguments_for(name, parameters):
         raise ValueError("Invalid tool arguments.")
 
     if name == "debugger_doctor":
-        return ["doctor"]
+        probe = parameters.get("probeWebBlink", False)
+        if type(probe) is not bool:
+            raise ValueError("Supply a boolean for probeWebBlink.")
+        return ["doctor", "--probe-web-blink"] if probe else ["doctor"]
     if name == "debugger_check_listeners":
         port = parameters.get("sshPort", 22)
         if type(port) is not int or not 0 < port < 65536:

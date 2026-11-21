@@ -2,10 +2,11 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
-from bdbg import check_listeners, host_capabilities, main, read_observations, read_weblink_transports
+from bdbg import capabilities, check_listeners, host_capabilities, main, read_observations, read_weblink_transports, web_blink_peer
 
 
 class CapabilityTests(unittest.TestCase):
@@ -26,6 +27,54 @@ class CapabilityTests(unittest.TestCase):
             missing = host_capabilities(Path(temporary) / "absent")
         self.assertEqual(missing["bluetooth"], {"status": "not_detected", "registeredAdapters": 0})
         self.assertEqual(host_capabilities(None)["bluetooth"], {"status": "unknown", "registeredAdapters": None})
+
+
+class PeerTests(unittest.TestCase):
+    def test_debugger_capability_response(self):
+        self.assertEqual(capabilities(), {
+            "schemaVersion": 1, "product": "blink-debugger", "version": "0.1.1",
+            "webLink": {"descriptor": "urn:web-blink:schema:weblink:1", "transportExtensionVersion": 1},
+        })
+
+    def test_missing_peer_is_supported(self):
+        with patch("bdbg.shutil.which", return_value=None):
+            self.assertEqual(web_blink_peer(), {"status": "missing"})
+
+    def test_checked_index_edition_and_response_shape(self):
+        entry = {"id": "urn:web-blink:schema:weblink:1", "version": "1.3.0"}
+        index = {"status": "ok", "data": {"schemaVersion": 1, "schemas": [entry]}}
+        with patch("bdbg.shutil.which", return_value="/test/blink"), patch("bdbg.read_peer_index", return_value=index):
+            self.assertEqual(web_blink_peer(), {
+                "status": "compatible", "descriptor": entry["id"], "descriptorSchema": "1.3.0",
+            })
+            entry["version"] = "1.2.0"
+            self.assertEqual(web_blink_peer()["status"], "incompatible")
+            index["data"]["schemas"].append(entry)
+            self.assertEqual(web_blink_peer(), {"status": "unavailable"})
+
+    def test_executable_is_called_with_fixed_arguments_and_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "blink"
+            executable.touch(mode=0o755)
+            with patch("bdbg.shutil.which", return_value=str(executable)):
+                for code in (
+                    'print("x" * 65537)',
+                    'import time; time.sleep(10)',
+                    'raise SystemExit(2)',
+                ):
+                    with self.subTest(code=code):
+                        executable.write_text(f"#!{sys.executable}\n{code}\n")
+                        with patch("bdbg.PEER_TIMEOUT", 0.5):
+                            self.assertEqual(web_blink_peer(), {"status": "unavailable"})
+                body = {"status": "ok", "data": {"schemaVersion": 1, "schemas": [
+                    {"id": "urn:web-blink:schema:weblink:1", "version": "1.3.0"},
+                ]}}
+                executable.write_text(
+                    f"#!{sys.executable}\nimport sys\n"
+                    "assert sys.argv[1:] == ['schemas', '--json']\n"
+                    f"print({json.dumps(body)!r})\n"
+                )
+                self.assertEqual(web_blink_peer()["status"], "compatible")
 
 
 class ListenerTests(unittest.TestCase):
